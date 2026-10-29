@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Squeek Odometer</title>
+<meta name="description" content="How far has Squeektoshi run? Live wheel stats for the hamster-powered Squeekchain.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d1020;--panel:#161b33;--edge:#2b3460;--blue:#5aa0ff;--pink:#ff8fc8;--fur:#e8be8c;--txt:#eef2ff;--sub:#9aa6cf;--ok:#4ade80;--warn:#fbbf24}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;padding:24px 16px 48px}
+.wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1{font-family:"Press Start 2P",monospace;font-size:clamp(18px,4vw,30px);line-height:1.4;margin:0;color:var(--blue);text-shadow:3px 3px 0 #23306a}
+h1 span{color:var(--pink)}
+.lede{color:var(--sub);margin:4px 0 0;font-size:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.card{background:var(--panel);border:2px solid var(--edge);padding:16px;min-width:0}
+.label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--sub)}
+.big{font-family:"Press Start 2P",monospace;font-size:clamp(16px,3vw,24px);margin-top:10px;font-variant-numeric:tabular-nums}
+.small{font-size:12px;color:var(--sub);margin-top:8px}
+.status{display:flex;align-items:center;gap:10px}
+.dot{width:12px;height:12px;background:var(--sub)}
+.dot.run{background:var(--ok);animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:.25}}
+.hero{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:16px;align-items:center}
+@media(max-width:720px){.hero{grid-template-columns:1fr}}
+.wheel{width:100%;max-width:260px;aspect-ratio:1;margin:0 auto}
+.wheel .rim{transform-origin:130px 130px}
+.wheel.spin .rim{animation:spin var(--dur,2s) linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.chart{overflow-x:auto}
+.chart svg{display:block;width:100%;min-width:520px;height:220px}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.fact b{color:var(--pink);font-family:"Press Start 2P",monospace;font-size:14px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+td,th{padding:6px 8px;border-bottom:1px solid var(--edge);text-align:left;white-space:nowrap}
+th{color:var(--sub);font-weight:400}
+.tbl{overflow-x:auto}
+a{color:var(--blue)}
+.guess{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+.guess input{background:#0b0e1c;border:2px solid var(--edge);color:var(--txt);padding:8px;width:120px;font:inherit}
+.guess button{background:var(--blue);border:0;color:#0b0e1c;padding:10px 14px;font:inherit;font-weight:700;cursor:pointer}
+.guess button:hover{background:var(--pink)}
+footer{color:var(--sub);font-size:12px;line-height:1.7}
+.err{color:var(--warn)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>SQUEEK <span>ODOMETER</span></h1>
+    <p class="lede">How far has Squeektoshi run? Live wheel stats for the hamster-powered <a href="https://x.com/squeekchain" target="_blank" rel="noopener">@squeekchain</a>. No run, no blocks.</p>
+  </header>
+
+  <section class="card hero">
+    <div>
+      <div class="status"><div class="dot" id="dot"></div><div class="label" id="state">connecting…</div></div>
+      <div class="big" id="tonight">—</div>
+      <div class="small">tonight's run · <span id="speed">—</span> · <span id="rpm">—</span></div>
+      <div class="small" id="fresh">—</div>
+      <div class="guess">
+        <span class="label">guess tonight's km</span>
+        <input id="gIn" type="number" min="0" step="0.1" placeholder="e.g. 9.5" aria-label="your guess in km">
+        <button id="gBtn" type="button">LOCK IT</button>
+        <span class="small" id="gOut"></span>
+      </div>
+    </div>
+    <svg class="wheel" id="wheel" viewBox="0 0 260 260" aria-hidden="true">
+      <g class="rim">
+        <circle cx="130" cy="130" r="118" fill="none" stroke="#5aa0ff" stroke-width="10"/>
+        <circle cx="130" cy="130" r="98" fill="none" stroke="#2b3460" stroke-width="4"/>
+        <g stroke="#2b3460" stroke-width="3">
+          <line x1="130" y1="12" x2="130" y2="248"/><line x1="12" y1="130" x2="248" y2="130"/>
+          <line x1="47" y1="47" x2="213" y2="213"/><line x1="213" y1="47" x2="47" y2="213"/>
+        </g>
+        <circle cx="130" cy="130" r="10" fill="#5aa0ff"/>
+      </g>
+      <g transform="translate(78 160)">
+        <ellipse cx="52" cy="34" rx="56" ry="36" fill="#e8be8c"/>
+        <ellipse cx="52" cy="46" rx="32" ry="22" fill="#fae1be"/>
+        <ellipse cx="102" cy="14" rx="28" ry="26" fill="#e8be8c"/>
+        <circle cx="92" cy="-8" r="9" fill="#e8be8c"/><circle cx="92" cy="-8" r="5" fill="#f2aaaa"/>
+        <rect x="106" y="6" width="7" height="7" fill="#1e2337"/>
+        <rect x="126" y="18" width="6" height="5" fill="#f28c96"/>
+      </g>
+    </svg>
+  </section>
+
+  <section class="grid">
+    <div class="card"><div class="label">lifetime distance</div><div class="big" id="life">—</div><div class="small" id="lifeSub">—</div></div>
+    <div class="card"><div class="label">block height</div><div class="big" id="blocks">—</div><div class="small" id="work">—</div></div>
+    <div class="card"><div class="label">settlements · last 24h</div><div class="big" id="settle">—</div><div class="small" id="lastTx">—</div></div>
+    <div class="card"><div class="label">avg per active night</div><div class="big" id="avg">—</div><div class="small" id="peak">—</div></div>
+  </section>
+
+  <section class="card">
+    <div class="label">nightly distance · last 30 days (km)</div>
+    <div class="chart" id="chart"><p class="small">loading…</p></div>
+  </section>
+
+  <section class="card">
+    <div class="label">in hamster units</div>
+    <div class="facts" id="facts" style="margin-top:12px"></div>
+  </section>
+
+  <section class="card">
+    <div class="label">recent settlements</div>
+    <div class="tbl"><table><thead><tr><th>rounds</th><th>work added</th><th>blocks</th><th>tx</th></tr></thead><tbody id="txs"><tr><td colspan="4">loading…</td></tr></tbody></table></div>
+  </section>
+
+  <footer>
+    Data: public Squeekchain API (api.squeekchain.com) on Sepolia testnet, refreshed every 10 s. Distances come from the wheel sensor;
+    blocks and settlements are read from the indexer. Fan-made, not affiliated with the Squeekchain team. Built by
+    <a href="https://x.com/syk233" target="_blank" rel="noopener">@syk233</a> · <a href="https://github.com/syk808/squeek-odometer" target="_blank" rel="noopener">source</a>.
+  </footer>
+</div>
+
+<script>
+(function(){
+  const API = "https://api.squeekchain.com/v1/";
+  const $ = id => document.getElementById(id);
+  const km = mm => (Number(mm) / 1e6);
+  const fmtKm = (mm, d = 2) => mm == null ? "—" : km(mm).toFixed(d) + " km";
+  const num = v => v == null ? "—" : Number(v).toLocaleString("en-US");
+  const ago = iso => { const s = Math.round((Date.now() - Date.parse(iso)) / 1000); return s < 60 ? s + "s ago" : s < 3600 ? Math.round(s / 60) + "m ago" : Math.round(s / 3600) + "h ago"; };
+  const get = p => fetch(API + p, { cache: "no-store" }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+  const store = { get(k){ try { return localStorage.getItem(k); } catch(e){ return null; } }, set(k, v){ try { localStorage.setItem(k, v); } catch(e){} } };
+  const today = () => new Date().toISOString().slice(0, 10);
+  let tonightMm = null;
+
+  async function live(){
+    try {
+      const s = await get("status");
+      const m = s.measurement || {};
+      const running = (m.coreStatus || "").toUpperCase() !== "IDLE" && Number(m.rpmMilli) > 0;
+      $("dot").className = "dot" + (running ? " run" : "");
+      $("state").textContent = running ? "SQUEEKTOSHI IS RUNNING" : (m.freshness === "online" ? "RESTING · wheel online" : "WHEEL OFFLINE");
+      tonightMm = m.distanceMm;
+      $("tonight").textContent = fmtKm(m.distanceMm);
+      $("speed").textContent = m.speedMmPerSecond != null ? (m.speedMmPerSecond * 3.6 / 1000).toFixed(2) + " km/h" : "—";
+      $("rpm").textContent = m.rpmMilli != null ? (m.rpmMilli / 1000).toFixed(1) + " rpm" : "—";
+      $("fresh").textContent = m.observedAt ? "sensor reading " + ago(m.observedAt) : "";
+      const w = $("wheel"); w.classList.toggle("spin", running);
+      if (running) w.style.setProperty("--dur", Math.max(0.3, 60 / Math.max(1, m.rpmMilli / 1000)) + "s");
+      const a = ((s.builder || {}).anchor) || {};
+      $("blocks").textContent = num(a.blockHeight);
+      $("work").textContent = num(m.cumulativeWorkUnits) + " work units mined";
+      renderGuess();
+    } catch (e) {
+      $("state").innerHTML = '<span class="err">API unreachable, retrying…</span>';
+    }
+  }
+
+  async function stats(){
+    try {
+      const st = await get("measurement/stats?range=30d");
+      const L = st.lifetime || {}, S = (st.activity || {}).summary || {};
+      $("life").textContent = fmtKm(L.observedDistanceMm, 1);
+      $("lifeSub").textContent = (L.activeDayCount || "—") + " active nights since " + (L.firstObservedAt || "").slice(0, 10);
+      $("avg").textContent = fmtKm(S.averageDistancePerActiveDayMm, 1);
+      if (S.peakWindowStartMinuteUtc != null) {
+        const h = Math.floor(S.peakWindowStartMinuteUtc / 60), mi = S.peakWindowStartMinuteUtc % 60;
+        $("peak").textContent = "busiest 30 min starts " + String(h).padStart(2, "0") + ":" + String(mi).padStart(2, "0") + " UTC";
+      }
+      facts(Number(L.observedDistanceMm));
+      chart((st.activity || {}).days || []);
+    } catch (e) { $("chart").innerHTML = '<p class="small err">stats unavailable right now</p>'; }
+  }
+
+  function facts(mm){
+    if (!mm) return;
+    const k = km(mm);
+    const items = [
+      [(k / 42.195).toFixed(2), "marathons"],
+      [Math.round(k * 1000 / 400).toLocaleString("en-US"), "laps of a 400 m track"],
+      [Math.round(k * 1000 / 330).toLocaleString("en-US"), "Eiffel Towers stacked"],
+      [(k / 8.6).toFixed(1), "trips across Central Park"],
+    ];
+    $("facts").innerHTML = items.map(([v, t]) => `<div class="fact"><b>${v}</b><div class="small">${t}</div></div>`).join("");
+  }
+
+  function chart(days){
+    const pts = days.map(d => ({ date: d.date, v: d.distanceMm == null ? null : km(d.distanceMm) }));
+    if (!pts.length) return;
+    const W = 960, H = 220, P = { l: 40, r: 12, t: 14, b: 30 };
+    const max = Math.max(1, ...pts.map(p => p.v || 0));
+    const bw = (W - P.l - P.r) / pts.length;
+    const y = v => H - P.b - v / max * (H - P.t - P.b);
+    let g = "";
+    [0, max / 2, max].forEach(t => { g += `<line x1="${P.l}" x2="${W - P.r}" y1="${y(t)}" y2="${y(t)}" stroke="#2b3460"/><text x="${P.l - 6}" y="${y(t) + 4}" fill="#9aa6cf" font-size="11" text-anchor="end">${t.toFixed(0)}</text>`; });
+    pts.forEach((p, i) => {
+      const x = P.l + i * bw + 2;
+      if (p.v) g += `<rect x="${x}" y="${y(p.v)}" width="${Math.max(2, bw - 4)}" height="${H - P.b - y(p.v)}" fill="#5aa0ff"><title>${p.date}: ${p.v.toFixed(2)} km</title></rect>`;
+      else g += `<rect x="${x}" y="${H - P.b - 2}" width="${Math.max(2, bw - 4)}" height="2" fill="#2b3460"><title>${p.date}: no data</title></rect>`;
+      if (i % 5 === 0 || i === pts.length - 1) g += `<text x="${x + bw / 2}" y="${H - 10}" fill="#9aa6cf" font-size="11" text-anchor="middle">${p.date.slice(5)}</text>`;
+    });
+    $("chart").innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="nightly distance chart">${g}</svg>`;
+  }
+
+  async function settlements(){
+    try {
+      const s = await get("settlements?range=24h");
+      const rows = (s.recentSettlements || []).slice(0, 8);
+      $("settle").textContent = num((s.summary || {}).settlementCount);
+      $("txs").innerHTML = rows.length ? rows.map(r => `<tr><td>${r.previousSettledThroughRound}→${r.settledThroughRound}</td><td>${num(r.workAdded)}</td><td>${r.firstCompletedBlock ?? "—"}–${r.lastCompletedBlock ?? "—"}</td><td><a href="https://sepolia.etherscan.io/tx/${r.transactionHash}" target="_blank" rel="noopener">${r.transactionHash.slice(0, 10)}…</a></td></tr>`).join("") : '<tr><td colspan="4">no settlements in the last 24h</td></tr>';
+      if (rows[0]) $("lastTx").innerHTML = `latest <a href="https://sepolia.etherscan.io/tx/${rows[0].transactionHash}" target="_blank" rel="noopener">${rows[0].transactionHash.slice(0, 12)}…</a>`;
+    } catch (e) { $("txs").innerHTML = '<tr><td colspan="4" class="err">settlements unavailable</td></tr>'; }
+  }
+
+  function renderGuess(){
+    const g = store.get("squeek-guess-" + today());
+    if (!g) return;
+    const actual = tonightMm == null ? null : km(tonightMm);
+    $("gOut").textContent = "your guess: " + Number(g).toFixed(1) + " km" + (actual != null ? " · now " + actual.toFixed(2) + " km (" + (actual >= g ? "passed it!" : (g - actual).toFixed(2) + " km to go") + ")" : "");
+  }
+  $("gBtn").addEventListener("click", () => {
+    const v = parseFloat($("gIn").value);
+    if (!(v >= 0)) { $("gOut").textContent = "enter a number in km"; return; }
+    store.set("squeek-guess-" + today(), String(v)); renderGuess();
+  });
+
+  live(); stats(); settlements();
+  setInterval(live, 10000); setInterval(settlements, 60000); setInterval(stats, 300000);
+})();
+</script>
+</body>
+</html>
